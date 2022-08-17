@@ -1,5 +1,5 @@
 resource "aws_s3_bucket" "my_bucket" {
-  bucket = var.name
+  bucket = local.url
 }
 
 data "aws_iam_policy_document" "my_bucket_s3_policy" {
