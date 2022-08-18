@@ -6,6 +6,10 @@ variable "domain" {
 variable "subdomain" {
   type        = string
   description = "(optional) describe your variable"
+  validation {
+    condition =  can(regex("^[0-9A-Za-z]+$", var.subdomain))
+    error_message = "For the application_name value only a-z, A-Z and 0-9 are allowed."
+  }
 }
 
 variable "certificate" {
