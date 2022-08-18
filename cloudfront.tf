@@ -1,21 +1,20 @@
 locals {
   tags                  = { template = "tf-modules", service = "aws_cloudfront_distribution" }
   custom_error_response = length(var.custom_error_response) == 0 ? null : var.custom_error_response
-  aws_acm_certificate   = try(aws_acm_certificate.cert.arn, "nope")
+  url                   = "${var.subdomain}.${var.domain}"
 }
 
 resource "aws_cloudfront_origin_access_identity" "origin_access_identity" {
 }
 
-data "aws_acm_certificate" "cert" {
-  domain = var.certificate.name
-}
-
-resource "aws_cloudfront_distribution" "my_cdn" {
+resource "aws_cloudfront_distribution" "this" {
+  depends_on = [
+    aws_acm_certificate_validation.this_validation
+  ]
 
   origin {
     domain_name = aws_s3_bucket.my_bucket.bucket_regional_domain_name
-    origin_id   = "${var.name}origin"
+    origin_id   = "${local.url}origin"
 
     s3_origin_config {
       origin_access_identity = aws_cloudfront_origin_access_identity.origin_access_identity.cloudfront_access_identity_path
@@ -26,12 +25,12 @@ resource "aws_cloudfront_distribution" "my_cdn" {
   is_ipv6_enabled     = true
   default_root_object = "index.html"
 
-  aliases = var.certificate.enabled ? null : ["${var.name}"]
+  aliases = ["${local.url}"]
 
   default_cache_behavior {
     allowed_methods  = ["GET", "HEAD"]
     cached_methods   = ["GET", "HEAD"]
-    target_origin_id = "${var.name}origin"
+    target_origin_id = "${local.url}origin"
 
     forwarded_values {
       query_string = false
@@ -56,10 +55,9 @@ resource "aws_cloudfront_distribution" "my_cdn" {
   price_class = "PriceClass_200"
 
   viewer_certificate {
-    cloudfront_default_certificate = var.certificate.enabled ? true : null
-    acm_certificate_arn            = var.certificate.enabled ? null : "${local.aws_acm_certificate}"
-    ssl_support_method             = var.certificate.enabled ? null : var.certificate.ssl_support_method
-    minimum_protocol_version       = var.certificate.minimum_protocol_version
+    acm_certificate_arn      = aws_acm_certificate.this.arn
+    ssl_support_method       = var.certificate.ssl_support_method
+    minimum_protocol_version = var.certificate.minimum_protocol_version
   }
 
   dynamic "custom_error_response" {

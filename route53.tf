@@ -1,12 +1,14 @@
 data "aws_route53_zone" "main" {
-  count  = var.certificate.enabled ? 1 : 0
-  name = "constant1n396.com"
+  name = var.domain
 }
 
-resource "aws_route53_record" "blog" {
-  count  = var.certificate.enabled ? 1 : 0
+resource "aws_route53_record" "cname" {
+    depends_on = [
+    aws_acm_certificate.this
+    # time_sleep.wait_600_seconds
+  ]
   zone_id = data.aws_route53_zone.main.zone_id
-  name    = "blog"
+  name    = var.subdomain
   type    = "CNAME"
   ttl     = "5"
 
@@ -14,6 +16,23 @@ resource "aws_route53_record" "blog" {
     weight = 10
   }
 
-  set_identifier = "blog"
-  records        = [aws_cloudfront_distribution.my_cdn.domain_name]
+  set_identifier = var.subdomain
+  records        = [aws_cloudfront_distribution.this.domain_name]
+}
+
+resource "aws_route53_record" "this_validation" {
+  for_each = {
+    for dvo in aws_acm_certificate.this.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  }
+
+  allow_overwrite = true
+  name            = each.value.name
+  records         = [each.value.record]
+  ttl             = 60
+  type            = each.value.type
+  zone_id         = data.aws_route53_zone.main.zone_id
 }
